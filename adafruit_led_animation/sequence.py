@@ -41,7 +41,8 @@ class AnimationSequence:
 
     :param members: The animation objects or groups.
     :param int advance_interval: Time in seconds between animations if cycling
-                                 automatically. Defaults to ``None``.
+                                 automatically. Can take a list of intervals,
+                                 one per animation. Defaults to ``None``.
     :param bool auto_clear: Clear the pixels between animations. If ``True``, the current animation
                             will be cleared from the pixels before the next one starts.
                             Defaults to ``False``.
@@ -89,9 +90,19 @@ class AnimationSequence:
                 "Cannot use both advance_interval and advance_on_cycle_complete."
             )
         self._members = members
-        self._advance_interval = (
-            advance_interval * MS_PER_SECOND if advance_interval else None
-        )
+        if isinstance(advance_interval, (tuple, list)):
+            if len(advance_interval) == len(members):
+                self._advance_interval = [
+                    interval * MS_PER_SECOND for interval in advance_interval
+                ]
+            else:
+                raise ValueError(
+                    "Number of intervals does not match number of animations."
+                )
+        else:
+            self._advance_interval = [
+                advance_interval * MS_PER_SECOND if advance_interval else None
+            ] * len(members)
         self._last_advance = monotonic_ms()
         self._current = 0
         self.auto_clear = auto_clear
@@ -145,7 +156,7 @@ class AnimationSequence:
         if not self._advance_interval:
             return
         now = monotonic_ms()
-        if now - self._last_advance > self._advance_interval:
+        if now - self._last_advance > self._advance_interval[self._current]:
             self._last_advance = now
             self._advance()
 
@@ -192,7 +203,7 @@ class AnimationSequence:
 
         :return: True if the animation draw cycle was triggered, otherwise False.
         """
-        if not self._paused and self._advance_interval:
+        if not self._paused and self._advance_interval[self._current]:
             self._auto_advance()
         return self.current_animation.animate(show)
 
